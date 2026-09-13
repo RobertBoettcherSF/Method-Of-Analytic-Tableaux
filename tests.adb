@@ -145,6 +145,7 @@ begin
       begin
          declare
             Bad_Not : constant Formula := Make_Not (null);
+            pragma Unreferenced (Bad_Not);
          begin
             null;
          end;
