@@ -1,5 +1,4 @@
 with Ada.Containers.Vectors;
-with Ada.Unchecked_Deallocation;
 
 package body Analytic_Tableaux is
 
@@ -16,10 +15,6 @@ package body Analytic_Tableaux is
    package Signed_Formula_Vectors is new Ada.Containers.Vectors
      (Index_Type   => Positive,
       Element_Type => Signed_Formula);
-
-   -- Free memory helper to prevent leaks
-   procedure Free_Formula is new Ada.Unchecked_Deallocation
-     (Formula_Rec, Formula);
 
    ---------------------------------------------------------------------------
    -- Constructors
@@ -54,7 +49,6 @@ package body Analytic_Tableaux is
          raise Invalid_Formula_Error with "Null operand in binary formula constructor";
       end if;
       
-      -- We must use static discriminants for variant records to avoid compiler errors
       case Op is
          when Op_And =>
             return new Formula_Rec'(Kind => Op_And, Left => Left, Right => Right);
@@ -186,43 +180,43 @@ package body Analytic_Tableaux is
          declare
             Fi : constant Formula := Branch.Element (I);
          begin
-            -- Double Negation: ~~A -> A
             if Fi.Kind = Op_Not and then Fi.Sub_Formula.Kind = Op_Not then
                declare
                   New_Branch : Formula_Vectors.Vector := Branch;
                begin
+                  New_Branch.Delete (I);
                   New_Branch.Append (Fi.Sub_Formula.Sub_Formula);
                   return Expand_Tableau_Unsigned (New_Branch);
                end;
             end if;
 
-            -- Conjunction: A & B -> A, B
             if Fi.Kind = Op_And then
                declare
                   New_Branch : Formula_Vectors.Vector := Branch;
                begin
+                  New_Branch.Delete (I);
                   New_Branch.Append (Fi.Left);
                   New_Branch.Append (Fi.Right);
                   return Expand_Tableau_Unsigned (New_Branch);
                end;
             end if;
 
-            -- Negated Disjunction: ~(A | B) -> ~A, ~B
             if Fi.Kind = Op_Not and then Fi.Sub_Formula.Kind = Op_Or then
                declare
                   New_Branch : Formula_Vectors.Vector := Branch;
                begin
+                  New_Branch.Delete (I);
                   New_Branch.Append (Make_Not (Fi.Sub_Formula.Left));
                   New_Branch.Append (Make_Not (Fi.Sub_Formula.Right));
                   return Expand_Tableau_Unsigned (New_Branch);
                end;
             end if;
 
-            -- Negated Implication: ~(A -> B) -> A, ~B
             if Fi.Kind = Op_Not and then Fi.Sub_Formula.Kind = Op_Implies then
                declare
                   New_Branch : Formula_Vectors.Vector := Branch;
                begin
+                  New_Branch.Delete (I);
                   New_Branch.Append (Fi.Sub_Formula.Left);
                   New_Branch.Append (Make_Not (Fi.Sub_Formula.Right));
                   return Expand_Tableau_Unsigned (New_Branch);
@@ -236,48 +230,52 @@ package body Analytic_Tableaux is
          declare
             Fi : constant Formula := Branch.Element (I);
          begin
-            -- Disjunction: A | B -> branch1: A | branch2: B
             if Fi.Kind = Op_Or then
                declare
                   Branch1 : Formula_Vectors.Vector := Branch;
                   Branch2 : Formula_Vectors.Vector := Branch;
                begin
+                  Branch1.Delete (I);
+                  Branch2.Delete (I);
                   Branch1.Append (Fi.Left);
                   Branch2.Append (Fi.Right);
                   return Expand_Tableau_Unsigned (Branch1) or else Expand_Tableau_Unsigned (Branch2);
                end;
             end if;
 
-            -- Implication: A -> B -> branch1: ~A | branch2: B
             if Fi.Kind = Op_Implies then
                declare
                   Branch1 : Formula_Vectors.Vector := Branch;
                   Branch2 : Formula_Vectors.Vector := Branch;
                begin
+                  Branch1.Delete (I);
+                  Branch2.Delete (I);
                   Branch1.Append (Make_Not (Fi.Left));
                   Branch2.Append (Fi.Right);
                   return Expand_Tableau_Unsigned (Branch1) or else Expand_Tableau_Unsigned (Branch2);
                end;
             end if;
 
-            -- Negated Conjunction: ~(A & B) -> branch1: ~A | branch2: ~B
             if Fi.Kind = Op_Not and then Fi.Sub_Formula.Kind = Op_And then
                declare
                   Branch1 : Formula_Vectors.Vector := Branch;
                   Branch2 : Formula_Vectors.Vector := Branch;
                begin
+                  Branch1.Delete (I);
+                  Branch2.Delete (I);
                   Branch1.Append (Make_Not (Fi.Sub_Formula.Left));
                   Branch2.Append (Make_Not (Fi.Sub_Formula.Right));
                   return Expand_Tableau_Unsigned (Branch1) or else Expand_Tableau_Unsigned (Branch2);
                end;
             end if;
 
-            -- Equivalence: A <-> B -> (A & B) | (~A & ~B)
             if Fi.Kind = Op_Equiv then
                declare
                   Branch1 : Formula_Vectors.Vector := Branch;
                   Branch2 : Formula_Vectors.Vector := Branch;
                begin
+                  Branch1.Delete (I);
+                  Branch2.Delete (I);
                   Branch1.Append (Fi.Left);
                   Branch1.Append (Fi.Right);
                   Branch2.Append (Make_Not (Fi.Left));
@@ -286,12 +284,13 @@ package body Analytic_Tableaux is
                end;
             end if;
 
-            -- Negated Equivalence: ~(A <-> B) -> (A & ~B) | (~A & B)
             if Fi.Kind = Op_Not and then Fi.Sub_Formula.Kind = Op_Equiv then
                declare
                   Branch1 : Formula_Vectors.Vector := Branch;
                   Branch2 : Formula_Vectors.Vector := Branch;
                begin
+                  Branch1.Delete (I);
+                  Branch2.Delete (I);
                   Branch1.Append (Fi.Sub_Formula.Left);
                   Branch1.Append (Make_Not (Fi.Sub_Formula.Right));
                   Branch2.Append (Make_Not (Fi.Sub_Formula.Left));
@@ -356,6 +355,7 @@ package body Analytic_Tableaux is
                   declare
                      New_Branch : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     New_Branch.Delete (I);
                      New_Branch.Append (Signed_Formula'(Sign => Sign_False, Form => F.Sub_Formula));
                      return Expand_Tableau_Signed (New_Branch);
                   end;
@@ -363,6 +363,7 @@ package body Analytic_Tableaux is
                   declare
                      New_Branch : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     New_Branch.Delete (I);
                      New_Branch.Append (Signed_Formula'(Sign => Sign_True, Form => F.Left));
                      New_Branch.Append (Signed_Formula'(Sign => Sign_True, Form => F.Right));
                      return Expand_Tableau_Signed (New_Branch);
@@ -372,6 +373,8 @@ package body Analytic_Tableaux is
                      Branch1 : Signed_Formula_Vectors.Vector := Branch;
                      Branch2 : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     Branch1.Delete (I);
+                     Branch2.Delete (I);
                      Branch1.Append (Signed_Formula'(Sign => Sign_True, Form => F.Left));
                      Branch2.Append (Signed_Formula'(Sign => Sign_True, Form => F.Right));
                      return Expand_Tableau_Signed (Branch1) or else Expand_Tableau_Signed (Branch2);
@@ -381,8 +384,23 @@ package body Analytic_Tableaux is
                      Branch1 : Signed_Formula_Vectors.Vector := Branch;
                      Branch2 : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     Branch1.Delete (I);
+                     Branch2.Delete (I);
                      Branch1.Append (Signed_Formula'(Sign => Sign_False, Form => F.Left));
                      Branch2.Append (Signed_Formula'(Sign => Sign_True, Form => F.Right));
+                     return Expand_Tableau_Signed (Branch1) or else Expand_Tableau_Signed (Branch2);
+                  end;
+               elsif F.Kind = Op_Equiv then
+                  declare
+                     Branch1 : Signed_Formula_Vectors.Vector := Branch;
+                     Branch2 : Signed_Formula_Vectors.Vector := Branch;
+                  begin
+                     Branch1.Delete (I);
+                     Branch2.Delete (I);
+                     Branch1.Append (Signed_Formula'(Sign => Sign_True, Form => F.Left));
+                     Branch1.Append (Signed_Formula'(Sign => Sign_True, Form => F.Right));
+                     Branch2.Append (Signed_Formula'(Sign => Sign_False, Form => F.Left));
+                     Branch2.Append (Signed_Formula'(Sign => Sign_False, Form => F.Right));
                      return Expand_Tableau_Signed (Branch1) or else Expand_Tableau_Signed (Branch2);
                   end;
                end if;
@@ -391,6 +409,7 @@ package body Analytic_Tableaux is
                   declare
                      New_Branch : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     New_Branch.Delete (I);
                      New_Branch.Append (Signed_Formula'(Sign => Sign_True, Form => F.Sub_Formula));
                      return Expand_Tableau_Signed (New_Branch);
                   end;
@@ -399,6 +418,8 @@ package body Analytic_Tableaux is
                      Branch1 : Signed_Formula_Vectors.Vector := Branch;
                      Branch2 : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     Branch1.Delete (I);
+                     Branch2.Delete (I);
                      Branch1.Append (Signed_Formula'(Sign => Sign_False, Form => F.Left));
                      Branch2.Append (Signed_Formula'(Sign => Sign_False, Form => F.Right));
                      return Expand_Tableau_Signed (Branch1) or else Expand_Tableau_Signed (Branch2);
@@ -407,6 +428,7 @@ package body Analytic_Tableaux is
                   declare
                      New_Branch : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     New_Branch.Delete (I);
                      New_Branch.Append (Signed_Formula'(Sign => Sign_False, Form => F.Left));
                      New_Branch.Append (Signed_Formula'(Sign => Sign_False, Form => F.Right));
                      return Expand_Tableau_Signed (New_Branch);
@@ -415,9 +437,23 @@ package body Analytic_Tableaux is
                   declare
                      New_Branch : Signed_Formula_Vectors.Vector := Branch;
                   begin
+                     New_Branch.Delete (I);
                      New_Branch.Append (Signed_Formula'(Sign => Sign_True, Form => F.Left));
                      New_Branch.Append (Signed_Formula'(Sign => Sign_False, Form => F.Right));
                      return Expand_Tableau_Signed (New_Branch);
+                  end;
+               elsif F.Kind = Op_Equiv then
+                  declare
+                     Branch1 : Signed_Formula_Vectors.Vector := Branch;
+                     Branch2 : Signed_Formula_Vectors.Vector := Branch;
+                  begin
+                     Branch1.Delete (I);
+                     Branch2.Delete (I);
+                     Branch1.Append (Signed_Formula'(Sign => Sign_True, Form => F.Left));
+                     Branch1.Append (Signed_Formula'(Sign => Sign_False, Form => F.Right));
+                     Branch2.Append (Signed_Formula'(Sign => Sign_False, Form => F.Left));
+                     Branch2.Append (Signed_Formula'(Sign => Sign_True, Form => F.Right));
+                     return Expand_Tableau_Signed (Branch1) or else Expand_Tableau_Signed (Branch2);
                   end;
                end if;
             end if;
