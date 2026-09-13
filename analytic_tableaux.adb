@@ -1,5 +1,4 @@
 with Ada.Containers.Vectors;
-with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 
 package body Analytic_Tableaux is
@@ -54,7 +53,20 @@ package body Analytic_Tableaux is
       if Left = null or else Right = null then
          raise Invalid_Formula_Error with "Null operand in binary formula constructor";
       end if;
-      return new Formula_Rec'(Kind => Op, Left => Left, Right => Right);
+      
+      -- We must use static discriminants for variant records to avoid compiler errors
+      case Op is
+         when Op_And =>
+            return new Formula_Rec'(Kind => Op_And, Left => Left, Right => Right);
+         when Op_Or =>
+            return new Formula_Rec'(Kind => Op_Or, Left => Left, Right => Right);
+         when Op_Implies =>
+            return new Formula_Rec'(Kind => Op_Implies, Left => Left, Right => Right);
+         when Op_Equiv =>
+            return new Formula_Rec'(Kind => Op_Equiv, Left => Left, Right => Right);
+         when others =>
+            raise Invalid_Formula_Error with "Invalid operator for binary formula";
+      end case;
    end Make_Binary;
 
    ---------------------------------------------------------------------------
